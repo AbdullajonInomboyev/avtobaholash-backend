@@ -1,0 +1,1 @@
+# Celery faqat production da ishlatiladi

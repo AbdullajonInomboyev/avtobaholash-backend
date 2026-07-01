@@ -1,0 +1,5 @@
+# Bu papkada SSL sertifikatlari saqlanadi
+# Let's Encrypt: certbot certonly --webroot -d avtobaholash.uz
+# Keyin nusxalang:
+#   cp /etc/letsencrypt/live/avtobaholash.uz/fullchain.pem ./ssl/
+#   cp /etc/letsencrypt/live/avtobaholash.uz/privkey.pem ./ssl/
