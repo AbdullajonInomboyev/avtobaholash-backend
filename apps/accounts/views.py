@@ -213,6 +213,15 @@ class UserListCreateView(generics.ListCreateAPIView):
                 ).values_list('student_id', flat=True)
                 qs = qs.filter(Q(id__in=teacher_ids) | Q(id__in=student_ids))
 
+        # Guruh bo'yicha filtr (frontend "guruh tanlash" uchun)
+        group_id = self.request.query_params.get('group')
+        if group_id:
+            from apps.organization.models import StudentGroup
+            ids = StudentGroup.objects.filter(
+                group_id=group_id, left_at__isnull=True
+            ).values_list('student_id', flat=True)
+            qs = qs.filter(id__in=ids)
+
         return qs.select_related('tenant')
 
     def get_serializer_class(self):

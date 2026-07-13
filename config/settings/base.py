@@ -146,6 +146,8 @@ REST_FRAMEWORK = {
     ),
     'DEFAULT_PAGINATION_CLASS': 'core.pagination.StandardPagination',
     'PAGE_SIZE': 20,
+    # Decimal maydonlar JSON'da son bo'lib qaytsin (string emas) — frontend .toFixed() uchun
+    'COERCE_DECIMAL_TO_STRING': False,
     'DEFAULT_RENDERER_CLASSES': (
         'rest_framework.renderers.JSONRenderer',
     ),
