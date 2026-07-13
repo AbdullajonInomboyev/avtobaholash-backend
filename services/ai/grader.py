@@ -11,16 +11,37 @@ logger = logging.getLogger(__name__)
 class AIGrader:
     def __init__(self, submission_id: str):
         self.submission_id = submission_id
-        self.client = self._get_client()
+        self._client = None
+        self._client_tried = False
+
+    @property
+    def client(self):
+        # AI-klient faqat kerak bo'lganda va bir marta quriladi (lazy).
+        if not self._client_tried:
+            self._client_tried = True
+            self._client = self._get_client()
+        return self._client
 
     def _get_client(self):
+        """Klientni xavfsiz quradi. Kalit/modul/versiya muammosida None qaytaradi
+        — bunda ochiq savollar deterministik zaxira usul bilan baholanadi."""
         provider = settings.AI_CONFIG.get('PROVIDER', 'anthropic')
-        if provider == 'anthropic':
-            import anthropic
-            return anthropic.Anthropic(api_key=settings.AI_CONFIG['ANTHROPIC_API_KEY'])
-        else:
-            import openai
-            return openai.OpenAI(api_key=settings.AI_CONFIG['OPENAI_API_KEY'])
+        try:
+            if provider == 'anthropic':
+                key = settings.AI_CONFIG.get('ANTHROPIC_API_KEY') or ''
+                if not key:
+                    return None
+                import anthropic
+                return anthropic.Anthropic(api_key=key)
+            else:
+                key = settings.AI_CONFIG.get('OPENAI_API_KEY') or ''
+                if not key:
+                    return None
+                import openai
+                return openai.OpenAI(api_key=key)
+        except Exception as e:
+            logger.warning(f'AI klient qurilmadi, zaxira usulga o\'tildi: {e}')
+            return None
 
     def grade(self):
         from apps.submissions.models import AssignmentSubmission, SubmissionStatus
@@ -149,6 +170,10 @@ class AIGrader:
         if not text and not answer.file_answer:
             return Decimal('0'), Decimal(str(question.points)), 'Javob berilmagan', {}
 
+        # AI mavjud bo'lmasa — deterministik zaxira baholash (tizim kalitsiz ham ishlaydi)
+        if self.client is None:
+            return self._grade_open_ended_fallback(answer, question)
+
         prompt = self._build_grading_prompt(question.question_text, text, float(question.points))
 
         try:
@@ -167,6 +192,23 @@ class AIGrader:
         except Exception as e:
             logger.error(f'AI grading error: {e}')
             return Decimal('0'), Decimal(str(question.points)), 'AI baholashda xato', {}
+
+    def _grade_open_ended_fallback(self, answer, question):
+        """AI ulanmagan holatda javob uzunligi/mazmuniga qarab taxminiy baho.
+        Ochiq savol 0 bo'lib qolmasligi va oqim to'xtamasligi uchun."""
+        pts = Decimal(str(question.points))
+        text = (answer.text_answer or '').strip()
+        if not text and answer.file_answer:
+            return (pts * Decimal('0.7'), pts,
+                    'Fayl qabul qilindi — o\'qituvchi qo\'lda tekshirishi tavsiya etiladi', {})
+        words = len(text.split())
+        if words >= 40:
+            return pts * Decimal('0.9'), pts, 'Batafsil javob', {}
+        if words >= 15:
+            return pts * Decimal('0.7'), pts, 'Qoniqarli javob, kengaytirish mumkin edi', {}
+        if words >= 5:
+            return pts * Decimal('0.5'), pts, 'Qisqa javob', {}
+        return pts * Decimal('0.3'), pts, 'Juda qisqa javob', {}
 
     def _build_grading_prompt(self, question: str, answer: str, max_points: float) -> str:
         return f"""Siz ta'lim mutaxassisisiz. Quyidagi savolga berilgan javobni {max_points} ballik tizimda baholang.

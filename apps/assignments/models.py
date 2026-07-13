@@ -81,6 +81,7 @@ class Assignment(TenantBaseModel):
         db_table = 'assignments'
         verbose_name = 'Topshiriq'
         verbose_name_plural = 'Topshiriqlar'
+        ordering = ['-created_at']
         indexes = [
             models.Index(fields=['subject_assignment', 'is_published']),
             models.Index(fields=['start_datetime', 'end_datetime']),

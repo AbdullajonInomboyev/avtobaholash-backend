@@ -49,8 +49,12 @@ class SyllabusAnalyzer:
             list(topics), list(questions), assignment.title
         )
 
+        # AI mavjud bo'lmasa — deterministik zaxira tahlil (kalitsiz ham ishlaydi)
+        client = self._get_client()
+        if client is None:
+            return self._local_relevance(list(topics), list(questions))
+
         try:
-            client = self._get_client()
             response = client.messages.create(
                 model=settings.AI_CONFIG.get('MODEL', 'claude-sonnet-4-6'),
                 max_tokens=1000,
@@ -109,11 +113,41 @@ FAQAT JSON formatda javob bering:
 
     def _get_client(self):
         provider = settings.AI_CONFIG.get('PROVIDER', 'anthropic')
-        if provider == 'anthropic':
-            import anthropic
-            return anthropic.Anthropic(api_key=settings.AI_CONFIG['ANTHROPIC_API_KEY'])
-        import openai
-        return openai.OpenAI(api_key=settings.AI_CONFIG['OPENAI_API_KEY'])
+        try:
+            if provider == 'anthropic':
+                key = settings.AI_CONFIG.get('ANTHROPIC_API_KEY') or ''
+                if not key:
+                    return None
+                import anthropic
+                return anthropic.Anthropic(api_key=key)
+            key = settings.AI_CONFIG.get('OPENAI_API_KEY') or ''
+            if not key:
+                return None
+            import openai
+            return openai.OpenAI(api_key=key)
+        except Exception as e:
+            logger.warning(f'AI klient qurilmadi, zaxira usulga: {e}')
+            return None
+
+    def _local_relevance(self, topics, questions):
+        topic_words = set()
+        for t in topics:
+            topic_words |= {w.lower() for w in re.findall(r'\w+', t) if len(w) > 3}
+        matched = 0
+        for q in questions:
+            q_words = {w.lower() for w in re.findall(r'\w+', q) if len(w) > 3}
+            if q_words & topic_words:
+                matched += 1
+        total = len(questions) or 1
+        ratio = matched / total
+        out = total - matched
+        if ratio >= 0.8:
+            fb = "Savollar sillabus mavzulariga to'liq mos."
+        elif ratio >= 0.5:
+            fb = f"{out} ta savol sillabus mavzularidan uzoqroq."
+        else:
+            fb = "Ko'p savollar sillabusda yo'q mavzularga tegishli ko'rinadi."
+        return {'score': round(ratio*100), 'feedback': fb, 'topics_covered': matched, 'topics_out': out}
 
 
 class SyllabusParser:

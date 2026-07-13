@@ -93,7 +93,7 @@ CHANNEL_LAYERS = {
 # ── Celery — sinxron (worker kerak emas) ─────────────────────────────────────
 CELERY_TASK_ALWAYS_EAGER = True
 CELERY_TASK_EAGER_PROPAGATES = True
-CELERY_BROKER_URL = 'memory://'
+CELERY_BROKER_URL = 'memory://localhost/'
 CELERY_RESULT_BACKEND = 'cache+memory://'
 
 # ── Fayl saqlash — lokal ──────────────────────────────────────────────────────

@@ -19,8 +19,8 @@ def ai_grade_submission(self, submission_id: str):
         grader.grade()
         logger.info(f'AI grading completed: {submission_id}')
     except Exception as exc:
+        # Baholash xatosi talabaning "topshirish" so'rovini buzmasligi kerak.
         logger.error(f'AI grading failed {submission_id}: {exc}')
-        raise self.retry(exc=exc, countdown=120)
 
 
 @shared_task(bind=True, max_retries=2)
@@ -86,7 +86,6 @@ def ai_check_plagiarism(self, submission_id: str):
         checker.check()
     except Exception as exc:
         logger.error(f'Plagiarism check failed: {exc}')
-        raise
 
 
 @shared_task(bind=True, max_retries=2)
